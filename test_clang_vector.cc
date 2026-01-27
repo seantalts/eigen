@@ -42,7 +42,7 @@ void test_packet(const char* name) {
     alignas(64) Scalar data[size];
     for (int i = 0; i < size; ++i) data[i] = Scalar(i);
     Packet loaded = pload<Packet>(data);
-    pstore<Packet>(data, loaded);
+    pstore<Scalar, Packet>(data, loaded);
     std::cout << "  pload/pstore: OK" << std::endl;
 
     std::cout << "  All tests passed for " << name << std::endl;
