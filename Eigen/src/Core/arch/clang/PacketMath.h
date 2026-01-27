@@ -325,12 +325,10 @@ namespace detail {
 // Note: pcast functions are not template specializations, just helpers
 // identical to preinterpret. We duplicate them here to avoid a circular
 // dependence with TypeCasting.h.
-// We use __builtin_bit_cast instead of reinterpret_cast because Clang does not
-// allow reinterpret_cast between ext_vector_type types.
-EIGEN_STRONG_INLINE Packet16i pcast_float_to_int(const Packet16f& a) { return __builtin_bit_cast(Packet16i, a); }
-EIGEN_STRONG_INLINE Packet16f pcast_int_to_float(const Packet16i& a) { return __builtin_bit_cast(Packet16f, a); }
-EIGEN_STRONG_INLINE Packet8l pcast_double_to_long(const Packet8d& a) { return __builtin_bit_cast(Packet8l, a); }
-EIGEN_STRONG_INLINE Packet8d pcast_long_to_double(const Packet8l& a) { return __builtin_bit_cast(Packet8d, a); }
+EIGEN_STRONG_INLINE Packet16i pcast_float_to_int(const Packet16f& a) { return reinterpret_cast<Packet16i>(a); }
+EIGEN_STRONG_INLINE Packet16f pcast_int_to_float(const Packet16i& a) { return reinterpret_cast<Packet16f>(a); }
+EIGEN_STRONG_INLINE Packet8l pcast_double_to_long(const Packet8d& a) { return reinterpret_cast<Packet8l>(a); }
+EIGEN_STRONG_INLINE Packet8d pcast_long_to_double(const Packet8l& a) { return reinterpret_cast<Packet8d>(a); }
 
 }  // namespace detail
 
@@ -369,7 +367,7 @@ EIGEN_STRONG_INLINE Packet8d pcast_long_to_double(const Packet8l& a) { return __
   template <int N>                                                                                   \
   EIGEN_STRONG_INLINE PACKET_TYPE plogical_shift_right(const PACKET_TYPE& a) {                       \
     using UnsignedT = detail::unsigned_vector_t<PACKET_TYPE>;                                        \
-    return __builtin_bit_cast(PACKET_TYPE, __builtin_bit_cast(UnsignedT, a) >> N);                       \
+    return reinterpret_cast<PACKET_TYPE>(reinterpret_cast<UnsignedT>(a) >> N);                       \
   }                                                                                                  \
   template <int N>                                                                                   \
   EIGEN_STRONG_INLINE PACKET_TYPE plogical_shift_left(const PACKET_TYPE& a) {                        \
