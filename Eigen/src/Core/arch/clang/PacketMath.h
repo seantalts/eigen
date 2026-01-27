@@ -303,9 +303,7 @@ EIGEN_CLANG_PACKET_SET1(Packet8l)
 #define EIGEN_CLANG_PACKET_ARITHMETIC(PACKET_TYPE)                             \
   template <>                                                                  \
   EIGEN_STRONG_INLINE PACKET_TYPE pisnan<PACKET_TYPE>(const PACKET_TYPE& a) {  \
-    /* Use __builtin_bit_cast because Clang comparison returns a different */  \
-    /* vector type (e.g., long vs int64_t on some platforms). */               \
-    return __builtin_bit_cast(PACKET_TYPE, a != a);                            \
+    return reinterpret_cast<PACKET_TYPE>(a != a);                              \
   }                                                                            \
   template <>                                                                  \
   EIGEN_STRONG_INLINE PACKET_TYPE pnegate<PACKET_TYPE>(const PACKET_TYPE& a) { \
@@ -339,10 +337,8 @@ EIGEN_STRONG_INLINE Packet8d pcast_long_to_double(const Packet8l& a) { return re
     return PACKET_TYPE(0);                                                                           \
   }                                                                                                  \
   template <>                                                                                        \
-  EIGEN_STRONG_INLINE PACKET_TYPE ptrue<PACKET_TYPE>(const PACKET_TYPE& /*unused*/) {                \
-    /* Clang vector comparison returns a vector of the signed type corresponding to the operand */   \
-    /* type, which may differ from PACKET_TYPE (e.g., long vs int64_t). Use bit_cast to convert. */  \
-    return __builtin_bit_cast(PACKET_TYPE, PACKET_TYPE(0) == PACKET_TYPE(0));                        \
+  constexpr EIGEN_STRONG_INLINE PACKET_TYPE ptrue<PACKET_TYPE>(const PACKET_TYPE& /*unused*/) {      \
+    return PACKET_TYPE(0) == PACKET_TYPE(0);                                                         \
   }                                                                                                  \
   template <>                                                                                        \
   EIGEN_STRONG_INLINE PACKET_TYPE pand<PACKET_TYPE>(const PACKET_TYPE& a, const PACKET_TYPE& b) {    \
@@ -383,9 +379,7 @@ EIGEN_CLANG_PACKET_BITWISE_INT(Packet8l)
   template <>                                                                                        \
   EIGEN_STRONG_INLINE PACKET_TYPE ptrue<PACKET_TYPE>(const PACKET_TYPE& /* unused */) {              \
     using Scalar = detail::scalar_type_of_vector_t<PACKET_TYPE>;                                     \
-    /* Clang vector comparison returns a vector whose element type may differ from PACKET_TYPE */    \
-    /* (e.g., long vs int64_t). Use __builtin_bit_cast to convert directly to PACKET_TYPE. */        \
-    return __builtin_bit_cast(PACKET_TYPE, PACKET_TYPE(Scalar(0)) == PACKET_TYPE(Scalar(0)));        \
+    return CAST_FROM_INT(PACKET_TYPE(Scalar(0)) == PACKET_TYPE(Scalar(0)));                          \
   }                                                                                                  \
   template <>                                                                                        \
   EIGEN_STRONG_INLINE PACKET_TYPE pand<PACKET_TYPE>(const PACKET_TYPE& a, const PACKET_TYPE& b) {    \
