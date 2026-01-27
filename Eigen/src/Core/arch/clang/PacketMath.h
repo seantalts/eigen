@@ -303,7 +303,9 @@ EIGEN_CLANG_PACKET_SET1(Packet8l)
 #define EIGEN_CLANG_PACKET_ARITHMETIC(PACKET_TYPE)                             \
   template <>                                                                  \
   EIGEN_STRONG_INLINE PACKET_TYPE pisnan<PACKET_TYPE>(const PACKET_TYPE& a) {  \
-    return reinterpret_cast<PACKET_TYPE>(a != a);                              \
+    /* Use __builtin_bit_cast because Clang comparison returns a different */  \
+    /* vector type (e.g., long vs int64_t on some platforms). */               \
+    return __builtin_bit_cast(PACKET_TYPE, a != a);                            \
   }                                                                            \
   template <>                                                                  \
   EIGEN_STRONG_INLINE PACKET_TYPE pnegate<PACKET_TYPE>(const PACKET_TYPE& a) { \
@@ -323,10 +325,12 @@ namespace detail {
 // Note: pcast functions are not template specializations, just helpers
 // identical to preinterpret. We duplicate them here to avoid a circular
 // dependence with TypeCasting.h.
-EIGEN_STRONG_INLINE Packet16i pcast_float_to_int(const Packet16f& a) { return reinterpret_cast<Packet16i>(a); }
-EIGEN_STRONG_INLINE Packet16f pcast_int_to_float(const Packet16i& a) { return reinterpret_cast<Packet16f>(a); }
-EIGEN_STRONG_INLINE Packet8l pcast_double_to_long(const Packet8d& a) { return reinterpret_cast<Packet8l>(a); }
-EIGEN_STRONG_INLINE Packet8d pcast_long_to_double(const Packet8l& a) { return reinterpret_cast<Packet8d>(a); }
+// We use __builtin_bit_cast instead of reinterpret_cast because Clang does not
+// allow reinterpret_cast between ext_vector_type types.
+EIGEN_STRONG_INLINE Packet16i pcast_float_to_int(const Packet16f& a) { return __builtin_bit_cast(Packet16i, a); }
+EIGEN_STRONG_INLINE Packet16f pcast_int_to_float(const Packet16i& a) { return __builtin_bit_cast(Packet16f, a); }
+EIGEN_STRONG_INLINE Packet8l pcast_double_to_long(const Packet8d& a) { return __builtin_bit_cast(Packet8l, a); }
+EIGEN_STRONG_INLINE Packet8d pcast_long_to_double(const Packet8l& a) { return __builtin_bit_cast(Packet8d, a); }
 
 }  // namespace detail
 
@@ -337,8 +341,10 @@ EIGEN_STRONG_INLINE Packet8d pcast_long_to_double(const Packet8l& a) { return re
     return PACKET_TYPE(0);                                                                           \
   }                                                                                                  \
   template <>                                                                                        \
-  constexpr EIGEN_STRONG_INLINE PACKET_TYPE ptrue<PACKET_TYPE>(const PACKET_TYPE& /*unused*/) {      \
-    return PACKET_TYPE(0) == PACKET_TYPE(0);                                                         \
+  EIGEN_STRONG_INLINE PACKET_TYPE ptrue<PACKET_TYPE>(const PACKET_TYPE& /*unused*/) {                \
+    /* Clang vector comparison returns a vector of the signed type corresponding to the operand */   \
+    /* type, which may differ from PACKET_TYPE (e.g., long vs int64_t). Use bit_cast to convert. */  \
+    return __builtin_bit_cast(PACKET_TYPE, PACKET_TYPE(0) == PACKET_TYPE(0));                        \
   }                                                                                                  \
   template <>                                                                                        \
   EIGEN_STRONG_INLINE PACKET_TYPE pand<PACKET_TYPE>(const PACKET_TYPE& a, const PACKET_TYPE& b) {    \
@@ -363,7 +369,7 @@ EIGEN_STRONG_INLINE Packet8d pcast_long_to_double(const Packet8l& a) { return re
   template <int N>                                                                                   \
   EIGEN_STRONG_INLINE PACKET_TYPE plogical_shift_right(const PACKET_TYPE& a) {                       \
     using UnsignedT = detail::unsigned_vector_t<PACKET_TYPE>;                                        \
-    return reinterpret_cast<PACKET_TYPE>(reinterpret_cast<UnsignedT>(a) >> N);                       \
+    return __builtin_bit_cast(PACKET_TYPE, __builtin_bit_cast(UnsignedT, a) >> N);                       \
   }                                                                                                  \
   template <int N>                                                                                   \
   EIGEN_STRONG_INLINE PACKET_TYPE plogical_shift_left(const PACKET_TYPE& a) {                        \
@@ -379,7 +385,9 @@ EIGEN_CLANG_PACKET_BITWISE_INT(Packet8l)
   template <>                                                                                        \
   EIGEN_STRONG_INLINE PACKET_TYPE ptrue<PACKET_TYPE>(const PACKET_TYPE& /* unused */) {              \
     using Scalar = detail::scalar_type_of_vector_t<PACKET_TYPE>;                                     \
-    return CAST_FROM_INT(PACKET_TYPE(Scalar(0)) == PACKET_TYPE(Scalar(0)));                          \
+    /* Clang vector comparison returns a vector whose element type may differ from PACKET_TYPE */    \
+    /* (e.g., long vs int64_t). Use __builtin_bit_cast to convert directly to PACKET_TYPE. */        \
+    return __builtin_bit_cast(PACKET_TYPE, PACKET_TYPE(Scalar(0)) == PACKET_TYPE(Scalar(0)));        \
   }                                                                                                  \
   template <>                                                                                        \
   EIGEN_STRONG_INLINE PACKET_TYPE pand<PACKET_TYPE>(const PACKET_TYPE& a, const PACKET_TYPE& b) {    \
