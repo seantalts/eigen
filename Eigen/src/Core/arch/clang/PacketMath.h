@@ -508,6 +508,11 @@ EIGEN_CLANG_PACKET_ELEMENTWISE(Packet8l)
   template <>                                                                 \
   EIGEN_STRONG_INLINE PACKET_TYPE psqrt<PACKET_TYPE>(const PACKET_TYPE& a) {  \
     return __builtin_elementwise_sqrt(a);                                     \
+  }                                                                           \
+  template <>                                                                 \
+  EIGEN_STRONG_INLINE PACKET_TYPE prsqrt<PACKET_TYPE>(const PACKET_TYPE& a) { \
+    return unpacket_traits<PACKET_TYPE>::type(1) /                            \
+           __builtin_elementwise_sqrt(a);                                     \
   }
 
 EIGEN_CLANG_PACKET_MATH_FLOAT(Packet16f)
