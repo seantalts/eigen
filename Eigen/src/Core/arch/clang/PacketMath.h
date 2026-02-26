@@ -508,16 +508,53 @@ EIGEN_CLANG_PACKET_ELEMENTWISE(Packet8l)
   template <>                                                                 \
   EIGEN_STRONG_INLINE PACKET_TYPE psqrt<PACKET_TYPE>(const PACKET_TYPE& a) {  \
     return __builtin_elementwise_sqrt(a);                                     \
-  }                                                                           \
-  template <>                                                                 \
-  EIGEN_STRONG_INLINE PACKET_TYPE prsqrt<PACKET_TYPE>(const PACKET_TYPE& a) { \
-    return unpacket_traits<PACKET_TYPE>::type(1) /                            \
-           __builtin_elementwise_sqrt(a);                                     \
   }
 
 EIGEN_CLANG_PACKET_MATH_FLOAT(Packet16f)
 EIGEN_CLANG_PACKET_MATH_FLOAT(Packet8d)
 #undef EIGEN_CLANG_PACKET_MATH_FLOAT
+
+// Safe prsqrt: _Pragma("float_control(precise, off)") allows the compiler
+// to emit a hardware rsqrt instruction (e.g. vrsqrt14ps on AVX-512) for the
+// fast path.  Special cases are then fixed up via bit manipulation:
+//   zero / subnormal  →  +inf   (rsqrt(0) is mathematically +inf)
+//   infinity          →  0      (rsqrt(inf) is 0)
+// NaN and negative inputs propagate naturally through sqrt / division.
+template <>
+EIGEN_STRONG_INLINE Packet16f prsqrt<Packet16f>(const Packet16f& x) {
+  _Pragma("float_control(precise, off)")
+  const Packet16f y_fast = 1.0f / __builtin_elementwise_sqrt(x);
+
+  const Packet16i u     = reinterpret_cast<Packet16i>(x);
+  const Packet16i abs_u = u & Packet16i(0x7FFFFFFF);
+  // Exponent field == 0  ↔  zero or subnormal; rsqrt → +inf.
+  const Packet16i mask_zero = (Packet16i)(((abs_u >> 23) & Packet16i(0xFF)) == Packet16i(0));
+  // Abs bit-pattern 0x7F800000  ↔  ±inf; rsqrt(inf) → 0.
+  const Packet16i mask_inf  = (Packet16i)(abs_u == Packet16i(0x7F800000));
+
+  Packet16i result = reinterpret_cast<Packet16i>(y_fast);
+  result = (~mask_zero & result) | (mask_zero & Packet16i(0x7F800000));  // → +inf
+  result =  ~mask_inf  & result;                                          // → 0
+  return reinterpret_cast<Packet16f>(result);
+}
+
+template <>
+EIGEN_STRONG_INLINE Packet8d prsqrt<Packet8d>(const Packet8d& x) {
+  _Pragma("float_control(precise, off)")
+  const Packet8d y_fast = 1.0 / __builtin_elementwise_sqrt(x);
+
+  const Packet8l u     = reinterpret_cast<Packet8l>(x);
+  const Packet8l abs_u = u & Packet8l(INT64_C(0x7FFFFFFFFFFFFFFF));
+  // Exponent field == 0  ↔  zero or subnormal; rsqrt → +inf.
+  const Packet8l mask_zero = (Packet8l)(((abs_u >> 52) & Packet8l(0x7FF)) == Packet8l(0));
+  // Abs bit-pattern 0x7FF0000000000000  ↔  ±inf; rsqrt(inf) → 0.
+  const Packet8l mask_inf  = (Packet8l)(abs_u == Packet8l(INT64_C(0x7FF0000000000000)));
+
+  Packet8l result = reinterpret_cast<Packet8l>(y_fast);
+  result = (~mask_zero & result) | (mask_zero & Packet8l(INT64_C(0x7FF0000000000000)));  // → +inf
+  result =  ~mask_inf  & result;                                                          // → 0
+  return reinterpret_cast<Packet8d>(result);
+}
 #endif
 
 // --- Fused Multiply-Add (MADD) ---
